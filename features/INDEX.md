@@ -15,7 +15,13 @@
 
 | ID | Feature | Status | Spec | Created |
 |----|---------|--------|------|---------|
+| PROJ-1 | Supabase Infrastructure Setup | Roadmap | — | 2026-05-21 |
+| PROJ-2 | User Authentication | Roadmap | — | 2026-05-21 |
+| PROJ-3 | Messung erfassen | Roadmap | — | 2026-05-21 |
+| PROJ-4 | Messliste mit Ampel-Hervorhebung | Roadmap | — | 2026-05-21 |
+| PROJ-5 | Verlaufsdiagramm | Roadmap | — | 2026-05-21 |
+| PROJ-6 | PDF-Export | Roadmap | — | 2026-05-21 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-1
+## Next Available ID: PROJ-7
