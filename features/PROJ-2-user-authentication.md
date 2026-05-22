@@ -215,17 +215,21 @@ Keine — `@supabase/ssr`, `react-hook-form`, `zod` und `@hookform/resolvers` si
 
 ## QA Test Results
 
-**QA-Datum:** 2026-05-22
-**Tester:** /qa skill
-**Entscheidung: NICHT PRODUKTIONSREIF — 1 High + 3 Medium Bugs**
+### Re-QA — 2026-05-22 (aktueller Stand)
 
-### Acceptance Criteria
+**Tester:** /qa skill
+**Entscheidung: NICHT PRODUKTIONSREIF — 4 Medium Bugs offen**
+
+**Gefixter Bug seit letztem QA-Lauf:**
+- ~~BUG-1 (High)~~ — **BEHOBEN:** `middleware.ts` nach `src/middleware.ts` verschoben + try/catch ergänzt; Route Protection funktioniert jetzt korrekt (curl + E2E bestätigt)
+
+#### Acceptance Criteria
 
 | # | Kriterium | Ergebnis | Notiz |
 |---|-----------|----------|-------|
-| R1 | Erfolgreiche Registrierung → Bestätigungsmail | MANUELL NICHT TESTBAR | Erfordert echte E-Mail |
-| R2 | Doppelte E-Mail → Fehlermeldung | FAIL | Supabase gibt `error: null` für bereits registrierte E-Mails → Error-Check greift nie |
-| R3 | Passwort < 8 Zeichen → Validierungsfehler | FAIL | Fehlendes `noValidate` — nativer Browser-Validator feuert statt Zod-Fehler |
+| R1 | Erfolgreiche Registrierung → Bestätigungsmail | NICHT TESTBAR | Erfordert echte E-Mail |
+| R2 | Doppelte E-Mail → Fehlermeldung | FAIL | BUG-3 — Supabase-identities-Check fehlt |
+| R3 | Passwort < 8 Zeichen → Validierungsfehler | FAIL | BUG-2 — `noValidate` fehlt |
 | R4 | Bereits eingeloggt auf `/register` → Redirect `/` | NICHT TESTBAR | Erfordert eingeloggten Zustand |
 | V1 | Bestätigungslink → eingeloggt + Redirect `/` | NICHT TESTBAR | Erfordert echte E-Mail |
 | V2 | Abgelaufener Bestätigungslink → Fehler + "Neuen Link" | NICHT TESTBAR | Erfordert E-Mail |
@@ -233,60 +237,56 @@ Keine — `@supabase/ssr`, `react-hook-form`, `zod` und `@hookform/resolvers` si
 | L1 | Korrekte Zugangsdaten → Redirect `/` | NICHT TESTBAR | Erfordert echtes Konto |
 | L2 | Falsche Zugangsdaten → generische Fehlermeldung | PASS | E2E-Test bestätigt |
 | L3 | Bereits eingeloggt auf `/login` → Redirect `/` | NICHT TESTBAR | Erfordert eingeloggten Zustand |
-| L4 | Nicht eingeloggt auf geschützter Seite → Redirect `/login` | FAIL | Middleware leitet nicht um (curl + E2E bestätigt: HTTP 200 auf `/` ohne Session) |
+| L4 | Nicht eingeloggt auf geschützter Seite → Redirect `/login` | PASS | curl: HTTP 307 → `/login`; E2E bestätigt (BUG-1 behoben) |
 | O1 | Logout → Session beendet + Redirect `/login` | NICHT TESTBAR | Erfordert eingeloggten Zustand |
 | P1 | Bekannte E-Mail → neutrale Bestätigung | PASS | E2E-Test bestätigt |
 | P2 | Unbekannte E-Mail → gleiche neutrale Meldung | PASS | E2E-Test bestätigt |
 | P3 | Reset-Link → neues Passwort → Redirect `/login` | NICHT TESTBAR | Erfordert E-Mail |
 | P4 | Abgelaufener Reset-Link → Fehler + "Neuen Link" | NICHT TESTBAR | Erfordert E-Mail |
 
-**Ergebnis: 3 Pass / 3 Fail / 10 nicht testbar (E-Mail-Flows)**
+**Ergebnis: 4 Pass / 2 Fail / 10 nicht testbar (E-Mail-Flows)**
 
-### Bugs
+#### Offene Bugs
 
-#### BUG-1 — High: Middleware leitet nicht um (Route Protection defekt)
-**Datei:** `middleware.ts`
-**Schritte:**
-1. App starten (`npm run dev`)
-2. `curl http://localhost:3000/` ohne Session-Cookie
-3. Erwartet: HTTP 307 Redirect zu `/login`
-4. Erhalten: HTTP 200 mit der Home-Page
-**Bestätigt:** curl + 2 E2E-Tests (chromium + Mobile Safari)
-**Root Cause:** `supabase.auth.getUser()` in der Middleware schlägt vermutlich fehl (kein try/catch) — Next.js serviert bei Middleware-Fehler die Seite im Fallback
-**Fix:** Middleware mit try/catch absichern; Fallback auf Redirect zu `/login` bei Fehler
-
-#### BUG-2 — Medium: Fehlendes `noValidate` — nativer Validator überschreibt Zod
-**Dateien:** `LoginForm.tsx`, `RegisterForm.tsx`, `ForgotPasswordForm.tsx`, `ResetPasswordForm.tsx`
+##### BUG-2 — Medium: Fehlendes `noValidate` — nativer Validator überschreibt Zod
+**Dateien:** `LoginForm.tsx:61`, `RegisterForm.tsx:79`, `ForgotPasswordForm.tsx:56`, `ResetPasswordForm.tsx:51`
 **Schritte:**
 1. `/login` aufrufen
 2. In E-Mail-Feld `notanemail` eingeben, Passwort beliebig
 3. Submit klicken
 4. Erwartet: "Bitte gib eine gültige E-Mail-Adresse ein" (Zod-Fehlermeldung)
-5. Erhalten: Browser-nativer Validierungstooltip, kein custom Text
+5. Erhalten: Browser-nativer Validierungstooltip statt custom Text
 **Bestätigt:** Chromium + Mobile Safari E2E-Tests
 **Fix:** `noValidate` zum `<form>`-Element in allen vier Form-Komponenten hinzufügen
 
-#### BUG-3 — Medium: RegisterForm erkennt doppelte E-Mail nicht
-**Datei:** `RegisterForm.tsx:44–53`
-**Problem:** Supabase gibt bei `signUp()` mit bereits registrierter E-Mail `{ error: null, data: { user: { identities: [] } } }` zurück — bewusstes Design zur User-Enumeration-Prävention. Der Error-Check `error.message.includes('already registered')` greift nie.
-**Ergebnis:** Nutzer sieht "Bestätigungsmail gesendet!" statt "Diese E-Mail-Adresse ist bereits registriert" (AC2 schlägt fehl)
-**Fix:** `data.user?.identities?.length === 0` prüfen nach `signUp()` und entsprechende Fehlermeldung anzeigen — OR: Spec anpassen, um die neutrale Meldung zu akzeptieren (sicherer gegen User Enumeration)
+##### BUG-3 — Medium: RegisterForm erkennt doppelte E-Mail nicht
+**Datei:** `RegisterForm.tsx:44–54`
+**Problem:** Supabase gibt bei `signUp()` mit bereits registrierter E-Mail `{ error: null, data: { user: { identities: [] } } }` zurück. Der Error-Check auf `error.message` greift nie, da `error` null ist.
+**Ergebnis:** Nutzer sieht "Bestätigungsmail gesendet!" statt "Diese E-Mail-Adresse ist bereits registriert"
+**Fix:** Nach `signUp()` prüfen: `if (data.user?.identities?.length === 0) { setError('Diese E-Mail-Adresse ist bereits registriert.') }`
+**Alternative:** Spec anpassen — neutrale Meldung akzeptieren (sicherer gegen User Enumeration, kein UI-Bug mehr)
 
-#### BUG-4 — Medium: ForgotPasswordForm kein `catch`-Block
-**Datei:** `ForgotPasswordForm.tsx:29–40`
-**Problem:** Nur `try...finally` ohne `catch`. Bei Netzwerkfehler: Loading-State wird zurückgesetzt, aber kein Feedback für den Nutzer — stilles Fehlschlagen.
-**Fix:** `catch`-Block hinzufügen: `setError('Ein Fehler ist aufgetreten. Bitte versuche es erneut.')`
+##### BUG-4 — Medium: ForgotPasswordForm kein `catch`-Block
+**Datei:** `ForgotPasswordForm.tsx:29–41`
+**Problem:** Nur `try...finally` ohne `catch`. Bei Netzwerkfehler wird Loading-State zurückgesetzt, aber kein Feedback für den Nutzer — stilles Fehlschlagen.
+**Fix:** `catch`-Block ergänzen mit `setError('Ein Fehler ist aufgetreten. Bitte versuche es erneut.')`
 
-#### BUG-5 — Low: Potenzieller Open Redirect in `/auth/callback`
+##### BUG-6 — Medium: Vitest-Config lädt Playwright-Spec-Dateien (NEU)
+**Datei:** `vitest.config.ts`
+**Problem:** Kein `include`-Pattern definiert — Vitest findet alle `*.spec.ts`-Dateien inkl. `tests/PROJ-2-user-authentication.spec.ts`. Das führt zum Fehler "Playwright Test did not expect test() to be called here"; `npm test` endet mit Exit-Code 1.
+**Impact:** CI schlägt fehl beim `npm test`-Schritt
+**Fix:** `include: ['src/**/*.test.ts']` zur `test`-Konfiguration in `vitest.config.ts` hinzufügen
+
+##### BUG-5 — Low: Potenzieller Open Redirect in `/auth/callback`
 **Datei:** `src/app/auth/callback/route.ts:8`
-**Problem:** `next`-Parameter kommt direkt aus der URL und wird ohne Validierung in `${origin}${next}` eingebaut. `${origin}` macht echte Open Redirects unwahrscheinlich, aber `next=//evil.com` o.Ä. könnte in manchen Browser-Interpretationen problematisch sein.
-**Fix:** Validieren dass `next` mit `/` beginnt und kein `//` enthält: `const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/'`
+**Problem:** `next`-Parameter kommt direkt aus der URL und wird ohne Validierung in `${origin}${next}` eingebaut. `${origin}` begrenzt echte Open Redirects, aber `next=//evil.com` könnte in manchen Interpretationen problematisch sein.
+**Fix:** `const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/'`
 
-### Security Audit
+#### Security Audit
 
 | Prüfung | Ergebnis |
 |---------|----------|
-| Route Protection | FAIL — Middleware schützt nicht (BUG-1) |
+| Route Protection | PASS — Middleware schützt korrekt (BUG-1 behoben) |
 | User Enumeration beim Login | PASS — generische Fehlermeldung |
 | User Enumeration beim Passwort-Reset | PASS — neutrale Meldung immer gleich |
 | XSS in Fehlermeldungen | PASS — React-Rendering, kein dangerouslySetInnerHTML |
@@ -294,20 +294,37 @@ Keine — `@supabase/ssr`, `react-hook-form`, `zod` und `@hookform/resolvers` si
 | Open Redirect | LOW RISK — BUG-5 dokumentiert |
 | CSRF | PASS — Supabase PKCE-Flow + Cookie-basiert |
 
-### Automatisierte Tests
+#### Automatisierte Tests
 
-**Unit-Tests:** `src/components/auth/auth-schemas.test.ts` — 14 Tests, alle bestanden (Zod-Validierungsschemas)
-**Regression:** `src/lib/supabase.test.ts` — 5 Tests, alle bestanden (PROJ-1, kein Regression)
+**Unit-Tests:** `src/components/auth/auth-schemas.test.ts` — 14 Tests bestanden; `src/lib/supabase.test.ts` — 5 Tests bestanden (PROJ-1, kein Regression)
+**`npm test` Exit-Code:** 1 (wegen BUG-6 — Playwright-Spec von Vitest aufgelesen)
 
-**E2E-Tests:** `tests/PROJ-2-user-authentication.spec.ts` — 29 bestanden, 5 gescheitert
-- FAIL: `unauthenticated user visiting / is redirected to /login` (chromium + Mobile Safari) → BUG-1
-- FAIL: `login form shows validation error for invalid email` (chromium + Mobile Safari) → BUG-2
-- FAIL: `login with wrong credentials shows generic error` (chromium) → transient Supabase Rate Limit oder Verbindungsfehler während paralleler Tests; wiederholen nach Bug-Fixes
+**E2E-Tests:** `tests/PROJ-2-user-authentication.spec.ts` — **32 bestanden, 2 gescheitert** (chromium + Mobile Safari)
+- FAIL: `login form shows validation error for invalid email` → BUG-2
+- ~~FAIL: `unauthenticated user visiting / is redirected to /login`~~ → BEHOBEN (BUG-1)
 
 **Nicht per E2E testbar (erfordern echte E-Mail):**
 - E-Mail-Verifizierungsflow
 - Passwort-Reset-Flow
 - Bereits-eingeloggt-Redirects
+
+---
+
+### Erster QA-Lauf — 2026-05-22 (historisch)
+
+**Entscheidung: NICHT PRODUKTIONSREIF — 1 High + 3 Medium Bugs**
+
+**E2E-Tests:** 29 bestanden, 5 gescheitert
+- FAIL: `unauthenticated user visiting / is redirected to /login` (chromium + Mobile Safari) → BUG-1
+- FAIL: `login form shows validation error for invalid email` (chromium + Mobile Safari) → BUG-2
+- FAIL: `login with wrong credentials shows generic error` (chromium) → transienter Supabase Rate Limit; im Re-QA nicht mehr reproduzierbar
+
+**Bugs aus erstem QA-Lauf:**
+- BUG-1 (High): Middleware Route Protection → **BEHOBEN**
+- BUG-2 (Medium): `noValidate` fehlt → offen
+- BUG-3 (Medium): RegisterForm doppelte E-Mail → offen
+- BUG-4 (Medium): ForgotPasswordForm kein catch → offen
+- BUG-5 (Low): Open Redirect in callback → offen
 
 ## Deployment
 _To be added by /deploy_

@@ -40,3 +40,4 @@ next-env.d.ts
 
 # MCP configuration (contains sensitive information)
 .mcp.json
+playwright-report/*
