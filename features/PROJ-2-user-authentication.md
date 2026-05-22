@@ -1,6 +1,6 @@
 # PROJ-2: User Authentication
 
-## Status: In Review
+## Status: Approved
 **Created:** 2026-05-22
 **Last Updated:** 2026-05-22
 
@@ -218,10 +218,15 @@ Keine — `@supabase/ssr`, `react-hook-form`, `zod` und `@hookform/resolvers` si
 ### Re-QA — 2026-05-22 (aktueller Stand)
 
 **Tester:** /qa skill
-**Entscheidung: NICHT PRODUKTIONSREIF — 4 Medium Bugs offen**
+**Entscheidung: PRODUKTIONSREIF — alle Bugs behoben**
 
-**Gefixter Bug seit letztem QA-Lauf:**
-- ~~BUG-1 (High)~~ — **BEHOBEN:** `middleware.ts` nach `src/middleware.ts` verschoben + try/catch ergänzt; Route Protection funktioniert jetzt korrekt (curl + E2E bestätigt)
+**Alle Bugs behoben:**
+- ~~BUG-1 (High)~~ — `middleware.ts` → `src/middleware.ts` + try/catch; Route Protection funktioniert (curl + E2E)
+- ~~BUG-2 (Medium)~~ — `noValidate` auf allen 4 Formularen; Zod-Fehler werden korrekt angezeigt
+- ~~BUG-3 (Medium)~~ — `identities.length === 0` Check nach `signUp()`; doppelte E-Mail wird erkannt
+- ~~BUG-4 (Medium)~~ — `catch`-Block in `ForgotPasswordForm` + `error`-State ergänzt
+- ~~BUG-5 (Low)~~ — `next`-Parameter in `/auth/callback` gegen `//`-Prefix validiert
+- ~~BUG-6 (Medium)~~ — `include`-Pattern in `vitest.config.ts`; `npm test` endet sauber
 
 #### Acceptance Criteria
 
