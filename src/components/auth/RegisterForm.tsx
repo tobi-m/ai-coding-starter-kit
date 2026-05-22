@@ -33,7 +33,7 @@ export function RegisterForm() {
     setLoading(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
         options: {
@@ -42,14 +42,12 @@ export function RegisterForm() {
       })
 
       if (error) {
-        if (
-          error.message.toLowerCase().includes('already registered') ||
-          error.message.toLowerCase().includes('already been registered')
-        ) {
-          setError('Diese E-Mail-Adresse ist bereits registriert.')
-        } else {
-          setError('Registrierung fehlgeschlagen. Bitte versuche es erneut.')
-        }
+        setError('Registrierung fehlgeschlagen. Bitte versuche es erneut.')
+        return
+      }
+
+      if (data.user?.identities?.length === 0) {
+        setError('Diese E-Mail-Adresse ist bereits registriert.')
         return
       }
 
@@ -76,7 +74,7 @@ export function RegisterForm() {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>

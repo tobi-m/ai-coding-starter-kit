@@ -20,6 +20,7 @@ type FormValues = z.infer<typeof schema>
 export function ForgotPasswordForm() {
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -27,6 +28,7 @@ export function ForgotPasswordForm() {
   })
 
   async function onSubmit(values: FormValues) {
+    setError(null)
     setLoading(true)
     try {
       const supabase = createClient()
@@ -35,6 +37,8 @@ export function ForgotPasswordForm() {
       })
       // Always show the same neutral message — never reveal if the email exists
       setSubmitted(true)
+    } catch {
+      setError('Ein Fehler ist aufgetreten. Bitte versuche es erneut.')
     } finally {
       setLoading(false)
     }
@@ -53,7 +57,12 @@ export function ForgotPasswordForm() {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         <FormField
           control={form.control}
           name="email"
