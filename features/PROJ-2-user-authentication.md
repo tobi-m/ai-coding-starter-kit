@@ -1,6 +1,6 @@
 # PROJ-2: User Authentication
 
-## Status: Architected
+## Status: In Progress
 **Created:** 2026-05-22
 **Last Updated:** 2026-05-22
 
@@ -191,7 +191,27 @@ Keine neuen Datenbanktabellen. Supabase Auth verwaltet Nutzer intern in `auth.us
 Keine — `@supabase/ssr`, `react-hook-form`, `zod` und `@hookform/resolvers` sind bereits installiert.
 
 ## Implementation Notes
-_To be added by /frontend and/or /backend_
+
+**Implementiert am:** 2026-05-22
+
+### Was gebaut wurde
+- `middleware.ts` — zentraler Session-Check; schützt alle Routen außer Auth-Seiten; leitet eingeloggte Nutzer von Auth-Seiten weg (außer `/reset-password` wegen Recovery-Session)
+- `src/app/auth/callback/route.ts` — Server Route Handler; tauscht Supabase-Code gegen Session; liest optionalen `next`-Parameter für Passwort-Reset-Redirect
+- `src/app/(auth)/login/page.tsx` — Login-Seite mit URL-Fehleranzeige (z.B. abgelaufener Verification-Link)
+- `src/app/(auth)/register/page.tsx` — Registrierungs-Seite
+- `src/app/(auth)/forgot-password/page.tsx` — Passwort-vergessen-Seite
+- `src/app/(auth)/reset-password/page.tsx` — Neues-Passwort-setzen-Seite
+- `src/components/auth/LoginForm.tsx` — react-hook-form + Zod; unterscheidet unverifizierten Nutzer von falschem Passwort
+- `src/components/auth/RegisterForm.tsx` — zeigt Erfolgs-Alert statt Redirect (Nutzer muss E-Mail bestätigen)
+- `src/components/auth/ForgotPasswordForm.tsx` — immer neutrale Meldung (kein User-Enumeration-Leak)
+- `src/components/auth/ResetPasswordForm.tsx` — ruft `updateUser()` mit Recovery-Session auf
+- `src/components/auth/LogoutButton.tsx` — Client Component; ruft `signOut()` auf, redirectet zu `/login`
+- `src/app/page.tsx` — Placeholder für PROJ-4 (Messliste)
+- `src/app/globals.css` — Primärfarbe auf Blau gesetzt (HSL 217 89% 54%)
+- `src/app/layout.tsx` — `lang="de"`, App-Metadata aktualisiert
+
+### Abweichungen vom Tech Design
+- Keine: Alle Seiten und Komponenten entsprechen der Spec und dem Architektur-Design exakt
 
 ## QA Test Results
 _To be added by /qa_
