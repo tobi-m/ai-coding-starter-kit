@@ -175,11 +175,8 @@ Gespeichert in: **Supabase PostgreSQL** (hosted, kein lokales Docker).
 #### ~~BUG-1 — Medium: Server client has no env var validation~~ FIXED 2026-05-22
 Added the same `if (!supabaseUrl || !supabaseAnonKey) throw new Error(...)` guard to `supabase-server.ts`, mirroring the browser client pattern.
 
-#### BUG-2 — Low: `supabase/schema.sql` index out of sync with live DB
-**File:** `supabase/schema.sql` line 35
-**Problem:** File documents `idx_measurements_measured_at` as single-column `(measured_at DESC)`, but live DB has composite `(user_id, measured_at DESC)` (which is correct per implementation notes)
-**Risk:** Developer running this SQL file directly would create a less efficient index; schema.sql is misleading as a reference
-**Fix:** Update line 35 to `create index idx_measurements_measured_at on public.measurements(user_id, measured_at desc);`
+#### ~~BUG-2 — Low: `supabase/schema.sql` index out of sync with live DB~~ FIXED 2026-05-22
+Updated `supabase/schema.sql` line 35 to composite index `(user_id, measured_at DESC)`, matching the live DB.
 
 ### Security Audit
 

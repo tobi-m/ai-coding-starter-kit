@@ -32,4 +32,4 @@ create policy "Users can delete own measurements"
   using (auth.uid() = user_id);
 
 create index idx_measurements_user_id on public.measurements(user_id);
-create index idx_measurements_measured_at on public.measurements(measured_at desc);
+create index idx_measurements_measured_at on public.measurements(user_id, measured_at desc);
