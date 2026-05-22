@@ -15,7 +15,7 @@ Patienten mit Bluthochdruck oder anderen Herz-Kreislauf-Erkrankungen, die regelm
 
 | Priority | Feature | Status |
 |----------|---------|--------|
-| P0 (MVP) | Supabase Infrastructure Setup | Roadmap |
+| P0 (MVP) | Supabase Infrastructure Setup | Planned |
 | P0 (MVP) | User Authentication (Registrierung, Login, Logout) | Roadmap |
 | P0 (MVP) | Messung erfassen (Eingabe, Bearbeiten, Löschen) | Roadmap |
 | P0 (MVP) | Messliste mit Ampel-Hervorhebung | Roadmap |
