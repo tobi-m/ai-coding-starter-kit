@@ -1,8 +1,8 @@
 # PROJ-1: Supabase Infrastructure Setup
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-05-21
-**Last Updated:** 2026-05-21 (architecture added)
+**Last Updated:** 2026-05-22 (MCP-basierte Schema-Migration hinzugefügt)
 
 ## Dependencies
 - None
@@ -18,7 +18,6 @@
 - Local Supabase Docker instance — we connect directly to hosted Supabase (solo project, no team isolation needed)
 - `profiles` table — Supabase Auth's built-in `auth.users` is sufficient for MVP; deferred if user profile features are added later
 - Supabase Storage setup — may be needed for PROJ-6 (PDF-Export), deferred to that feature
-- Database migration tooling — Supabase handles schema migrations via the dashboard for this solo project
 - Staging / preview environments — single hosted Supabase project is sufficient
 
 ## Acceptance Criteria
@@ -31,6 +30,7 @@
 - [ ] Angenommen Row Level Security ist aktiviert, wenn ein eingeloggter Nutzer die `measurements`-Tabelle abfragt, dann sieht er ausschließlich seine eigenen Einträge.
 - [ ] Angenommen Row Level Security ist aktiviert, wenn ein nicht eingeloggter Request auf die `measurements`-Tabelle trifft, dann wird der Zugriff verweigert.
 - [ ] Angenommen das Supabase-Projekt ist verbunden, wenn TypeScript-Typen aus dem Schema generiert werden, dann stimmen die Typen mit der tatsächlichen Tabellenstruktur überein.
+- [ ] Angenommen der Supabase MCP Server ist konfiguriert, wenn die Migration ausgeführt wird, dann wird die `measurements`-Tabelle mit allen Pflichtfeldern, RLS-Aktivierung und den vier Policies (SELECT, INSERT, UPDATE, DELETE) automatisiert im Supabase-Projekt angelegt.
 
 ## Edge Cases
 - Fehlende oder falsche Env-Variablen: App sollte nicht lautlos fehlschlagen — expliziter Startup-Fehler erforderlich.
@@ -77,6 +77,7 @@
 | Zwei Client-Instanzen (Browser + Server) | App Router erfordert getrennte Clients — Browser-Client für Client Components, Server-Client für Server Components und API Routes | 2026-05-21 |
 | Auto-generierte TypeScript-Typen via Supabase CLI | Schema-Änderungen werden sofort als TypeScript-Fehler sichtbar; verhindert stille Typ-Abweichungen zur Laufzeit | 2026-05-21 |
 | `.env.example` eingecheckt | Dokumentiert welche Env-Variablen benötigt werden, ohne echte Credentials preiszugeben | 2026-05-21 |
+| Schema-Anlage via Supabase MCP statt Dashboard | MCP Server ist konfiguriert — automatisierte Migration ist zuverlässiger und reproduzierbarer als manuelle Dashboard-Klicks | 2026-05-22 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
@@ -134,8 +135,89 @@ Gespeichert in: **Supabase PostgreSQL** (hosted, kein lokales Docker).
 
 `@supabase/supabase-js` ist bereits installiert — keine Änderung nötig.
 
+## Implementation Notes
+
+**Implementiert am:** 2026-05-22
+
+### Was gebaut wurde
+- `measurements`-Tabelle via Supabase MCP Migration angelegt (`create_measurements_table`)
+- RLS aktiviert mit 4 Policies: SELECT, INSERT, UPDATE, DELETE (jeweils `auth.uid() = user_id`)
+- Zwei Indizes: `idx_measurements_user_id` (einfach) und `idx_measurements_measured_at` (composite auf `user_id, measured_at DESC` für sortierte Listenabfragen)
+- Browser-Client: `src/lib/supabase.ts` — exportiert `createClient()` mit Env-Var-Validierung
+- Server-Client: `src/lib/supabase-server.ts` — Cookie-basiert für App Router Server Components
+- TypeScript-Typen: `src/lib/database.types.ts` — manuell angelegt, stimmt mit tatsächlichem Schema überein
+
+### Abweichungen vom Tech Design
+- Keine: Schema und Clients entsprechen der Spec exakt
+
 ## QA Test Results
-_To be added by /qa_
+
+**QA Date:** 2026-05-22
+**Tester:** /qa skill
+**Decision: NOT READY — 1 Medium bug must be fixed**
+
+### Acceptance Criteria
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| AC1 | Clear error on missing env vars at startup | PARTIAL | Browser client (`supabase.ts`) throws correct message. Server client (`supabase-server.ts`) uses `!` assertion — no validation, cryptic failure. |
+| AC2 | Typed Supabase client available on import | PASS | Both clients typed with `Database` generic |
+| AC3 | measurements table with all required columns | PASS | All 8 columns, correct types, NOT NULL constraints, defaults verified in live DB |
+| AC4 | RLS: logged-in user sees only own rows | PASS | 4 policies (SELECT/INSERT/UPDATE/DELETE) all scoped to `auth.uid() = user_id` |
+| AC5 | RLS: unauthenticated access denied | PASS | RLS enabled, no public/anon policies — access denied by default |
+| AC6 | TypeScript types match schema | PASS | `database.types.ts` matches live schema exactly |
+| AC7 | MCP migration creates table with RLS + policies | PASS | Migration `create_measurements_table` applied, all 4 policies present |
+
+**Result: 6/7 pass, 1 partial fail (AC1 server-side)**
+
+### Bugs Found
+
+#### BUG-1 — Medium: Server client has no env var validation
+**File:** `src/lib/supabase-server.ts`
+**Steps to reproduce:**
+1. Remove `NEXT_PUBLIC_SUPABASE_URL` from `.env.local`
+2. Trigger a Server Component or API route that imports `createClient` from `supabase-server.ts`
+3. Observe: cryptic runtime error from `@supabase/ssr`, not the clear message from AC1
+**Expected:** Same clear error as browser client: _"Missing Supabase environment variables. Ensure … are set in .env.local"_
+**Actual:** TypeScript `!` assertion is compile-time only — `undefined` is passed to `createServerClient`, fails with an opaque error
+**Fix:** Add same `if (!url || !key) throw new Error(...)` guard at top of `supabase-server.ts`
+
+#### BUG-2 — Low: `supabase/schema.sql` index out of sync with live DB
+**File:** `supabase/schema.sql` line 35
+**Problem:** File documents `idx_measurements_measured_at` as single-column `(measured_at DESC)`, but live DB has composite `(user_id, measured_at DESC)` (which is correct per implementation notes)
+**Risk:** Developer running this SQL file directly would create a less efficient index; schema.sql is misleading as a reference
+**Fix:** Update line 35 to `create index idx_measurements_measured_at on public.measurements(user_id, measured_at desc);`
+
+### Security Audit
+
+| Check | Result |
+|-------|--------|
+| RLS policies scoped correctly | PASS — `auth.uid() = user_id` on all 4 ops |
+| No hardcoded credentials | PASS |
+| FK CASCADE DELETE prevents orphaned data | PASS — `confdeltype = 'c'` confirmed in live DB |
+| `notes` nullable, no data integrity issue | PASS |
+| Env vars not committed | PASS — `.env.local` in `.gitignore` |
+| Server client env var bypass | FAIL — captured as BUG-1 |
+
+### Edge Cases Tested
+
+| Edge Case | Result |
+|-----------|--------|
+| `notes` is optional/nullable | PASS — no NOT NULL in schema |
+| `measured_at` has no default (user-controlled) | PASS — no default value on column |
+| CASCADE DELETE configured on user_id FK | PASS — verified live via pg_constraint |
+| Both browser and server clients exported | PASS |
+
+### Automated Tests
+
+**Unit tests:** `src/lib/supabase.test.ts` — 5 tests, all pass
+- Missing URL → throws "Missing Supabase environment variables"
+- Missing anon key → throws "Missing Supabase environment variables"
+- Both missing → throws "Missing Supabase environment variables"
+- Both set → `createClient` is exported and callable
+- `createClient()` returns a client instance
+
+**E2E tests:** Not applicable — pure infrastructure feature, no UI to test with Playwright
 
 ## Deployment
 _To be added by /deploy_

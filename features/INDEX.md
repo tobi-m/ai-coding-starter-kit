@@ -15,7 +15,7 @@
 
 | ID | Feature | Status | Spec | Created |
 |----|---------|--------|------|---------|
-| PROJ-1 | Supabase Infrastructure Setup | In Progress | [spec](PROJ-1-supabase-infrastructure-setup.md) | 2026-05-21 |
+| PROJ-1 | Supabase Infrastructure Setup | In Review | [spec](PROJ-1-supabase-infrastructure-setup.md) | 2026-05-21 |
 | PROJ-2 | User Authentication | Roadmap | — | 2026-05-21 |
 | PROJ-3 | Messung erfassen | Roadmap | — | 2026-05-21 |
 | PROJ-4 | Messliste mit Ampel-Hervorhebung | Roadmap | — | 2026-05-21 |
