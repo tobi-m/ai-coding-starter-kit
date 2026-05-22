@@ -1,6 +1,6 @@
 # PROJ-1: Supabase Infrastructure Setup
 
-## Status: In Review
+## Status: Approved
 **Created:** 2026-05-21
 **Last Updated:** 2026-05-22 (MCP-basierte Schema-Migration hinzugefügt)
 
@@ -154,13 +154,13 @@ Gespeichert in: **Supabase PostgreSQL** (hosted, kein lokales Docker).
 
 **QA Date:** 2026-05-22
 **Tester:** /qa skill
-**Decision: NOT READY — 1 Medium bug must be fixed**
+**Decision: APPROVED — all bugs fixed, 7/7 AC pass**
 
 ### Acceptance Criteria
 
 | # | Criterion | Result | Notes |
 |---|-----------|--------|-------|
-| AC1 | Clear error on missing env vars at startup | PARTIAL | Browser client (`supabase.ts`) throws correct message. Server client (`supabase-server.ts`) uses `!` assertion — no validation, cryptic failure. |
+| AC1 | Clear error on missing env vars at startup | PASS | Both browser and server clients throw clear error on missing env vars |
 | AC2 | Typed Supabase client available on import | PASS | Both clients typed with `Database` generic |
 | AC3 | measurements table with all required columns | PASS | All 8 columns, correct types, NOT NULL constraints, defaults verified in live DB |
 | AC4 | RLS: logged-in user sees only own rows | PASS | 4 policies (SELECT/INSERT/UPDATE/DELETE) all scoped to `auth.uid() = user_id` |
@@ -168,19 +168,12 @@ Gespeichert in: **Supabase PostgreSQL** (hosted, kein lokales Docker).
 | AC6 | TypeScript types match schema | PASS | `database.types.ts` matches live schema exactly |
 | AC7 | MCP migration creates table with RLS + policies | PASS | Migration `create_measurements_table` applied, all 4 policies present |
 
-**Result: 6/7 pass, 1 partial fail (AC1 server-side)**
+**Result: 7/7 pass** _(BUG-1 fixed 2026-05-22)_
 
 ### Bugs Found
 
-#### BUG-1 — Medium: Server client has no env var validation
-**File:** `src/lib/supabase-server.ts`
-**Steps to reproduce:**
-1. Remove `NEXT_PUBLIC_SUPABASE_URL` from `.env.local`
-2. Trigger a Server Component or API route that imports `createClient` from `supabase-server.ts`
-3. Observe: cryptic runtime error from `@supabase/ssr`, not the clear message from AC1
-**Expected:** Same clear error as browser client: _"Missing Supabase environment variables. Ensure … are set in .env.local"_
-**Actual:** TypeScript `!` assertion is compile-time only — `undefined` is passed to `createServerClient`, fails with an opaque error
-**Fix:** Add same `if (!url || !key) throw new Error(...)` guard at top of `supabase-server.ts`
+#### ~~BUG-1 — Medium: Server client has no env var validation~~ FIXED 2026-05-22
+Added the same `if (!supabaseUrl || !supabaseAnonKey) throw new Error(...)` guard to `supabase-server.ts`, mirroring the browser client pattern.
 
 #### BUG-2 — Low: `supabase/schema.sql` index out of sync with live DB
 **File:** `supabase/schema.sql` line 35
