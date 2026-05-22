@@ -1,6 +1,6 @@
 # PROJ-2: User Authentication
 
-## Status: Planned
+## Status: Architected
 **Created:** 2026-05-22
 **Last Updated:** 2026-05-22
 
@@ -91,11 +91,104 @@
 | Account-Löschen außerhalb MVP | Eigene UX-Komplexität (Bestätigungsdialog, Datenlöschung); nicht kritisch für MVP | 2026-05-22 |
 | Generische Fehlermeldung bei Login | Verhindert User Enumeration — Angreifer darf nicht wissen, ob eine E-Mail registriert ist | 2026-05-22 |
 
+### Technical Decisions
+| Decision | Rationale | Date |
+|----------|-----------|------|
+| Middleware für Route-Schutz | Ein zentraler Ort statt Checks auf jeder einzelnen Seite — gilt automatisch für alle neuen Seiten | 2026-05-22 |
+| Client Components für Formulare | Auth-Aufrufe (Login, Registrierung, Reset) funktionieren im Browser mit dem vorhandenen Browser-Client aus PROJ-1; keine Server Actions nötig | 2026-05-22 |
+| Server Route Handler für `/auth/callback` | Supabase-E-Mail-Links enthalten einmalige Token — müssen serverseitig gegen eine Session getauscht werden | 2026-05-22 |
+| Route-Gruppe `(auth)/` statt `/auth/` | Gruppiert Auth-Seiten im Dateisystem ohne `/auth/`-Prefix in der URL | 2026-05-22 |
+| Keine neuen Pakete | `@supabase/ssr`, `react-hook-form`, `zod`, `@hookform/resolvers` bereits in PROJ-1 installiert | 2026-05-22 |
+
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Was gebaut wird
+
+```
+Projekt-Root
++-- middleware.ts              ← Zentraler Session-Check + Route-Schutz
+
+src/app/
++-- (auth)/                   ← Route-Gruppe (kein URL-Segment)
+|   +-- login/page.tsx
+|   +-- register/page.tsx
+|   +-- forgot-password/page.tsx
+|   +-- reset-password/page.tsx
++-- auth/
+|   +-- callback/route.ts     ← Server-Handler für E-Mail-Links (Verifizierung + Reset)
++-- layout.tsx                ← bestehend, kein Login-UI
++-- page.tsx                  ← geschützt (Messliste, kommt in PROJ-4)
+
+src/components/
++-- auth/
+    +-- LoginForm.tsx
+    +-- RegisterForm.tsx
+    +-- ForgotPasswordForm.tsx
+    +-- ResetPasswordForm.tsx
+```
+
+### Seitenstruktur
+
+```
+/login
++-- LoginForm
+    +-- E-Mail-Feld
+    +-- Passwort-Feld
+    +-- Abschicken-Button
+    +-- Fehlermeldung (generisch: "E-Mail oder Passwort ist falsch")
+    +-- Link → /forgot-password ("Passwort vergessen?")
+    +-- Link → /register ("Noch kein Konto?")
+
+/register
++-- RegisterForm
+    +-- E-Mail-Feld
+    +-- Passwort-Feld (min. 8 Zeichen, Client-Validierung via Zod)
+    +-- Abschicken-Button
+    +-- Erfolgsmeldung nach Registrierung (kein Redirect — Nutzer muss E-Mail bestätigen)
+    +-- Link → /login ("Bereits registriert?")
+
+/forgot-password
++-- ForgotPasswordForm
+    +-- E-Mail-Feld
+    +-- Abschicken-Button
+    +-- Bestätigungsmeldung (neutral — immer gleich, unabhängig ob E-Mail bekannt)
+    +-- Link → /login ("Zurück zum Login")
+
+/reset-password
++-- ResetPasswordForm
+    +-- Neues-Passwort-Feld (min. 8 Zeichen)
+    +-- Abschicken-Button
+    +-- Fehlermeldung bei abgelaufenem Link + "Neuen Link anfordern"-Button
+    +-- Redirect zu /login nach Erfolg
+
+/auth/callback  (kein UI — unsichtbarer Server-Handler)
++-- Liest Token aus URL-Parametern
++-- Tauscht Token gegen Session (serverseitig)
++-- Weiterleitung zu / (Erfolg) oder /login?error=... (Fehler)
+```
+
+### Route-Schutz via Middleware
+
+```
+Eingehende Anfrage
+       ↓
+Öffentliche Route? (/login, /register, /forgot-password, /reset-password, /auth/callback)
+    ↓ ja                            ↓ nein (geschützt)
+Nutzer eingeloggt?              Nutzer eingeloggt?
+  ↓ ja      ↓ nein               ↓ ja        ↓ nein
+Redirect /  Seite zeigen       Seite zeigen  Redirect /login
+```
+
+### Datenmodell
+
+Keine neuen Datenbanktabellen. Supabase Auth verwaltet Nutzer intern in `auth.users`. Die `measurements`-Tabelle hat bereits den Foreign Key auf `auth.users(id)` (eingerichtet in PROJ-1).
+
+### Neue Pakete
+
+Keine — `@supabase/ssr`, `react-hook-form`, `zod` und `@hookform/resolvers` sind bereits installiert.
 
 ## Implementation Notes
 _To be added by /frontend and/or /backend_
