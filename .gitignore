@@ -40,4 +40,7 @@ next-env.d.ts
 
 # MCP configuration (contains sensitive information)
 .mcp.json
+
+# QA results
 playwright-report/*
+test-results/*
